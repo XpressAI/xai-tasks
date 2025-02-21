@@ -4,7 +4,14 @@ from xai_components.base import InArg, InCompArg, OutArg, Component, xai_compone
 
 @xai_component
 class TasksOpenDB(Component):
-    """Component to open the SQLite database and create the schema if necessary."""
+    """Opens or creates a SQLite database with the proper schema for task management.
+    
+    ##### inPorts:
+    - db_file: Path to the SQLite database file
+    
+    ##### outPorts:
+    - connection: SQLite database connection object
+    """
     
     db_file: InCompArg[str]  # Path to the SQLite database file
     connection: OutArg[sqlite3.Connection]  # Output connection to the database
@@ -32,7 +39,18 @@ class TasksOpenDB(Component):
 
 @xai_component
 class TasksCreateTask(Component):
-    """Component to create a new task."""
+    """Creates a new task in the database with the specified details.
+    
+    ##### inPorts:
+    - connection: SQLite database connection
+    - summary: Brief description of the task
+    - conversation: List of conversation history related to the task
+    - details: Detailed description of the task
+    - steps: List of steps to complete the task
+    
+    ##### outPorts:
+    - task_id: ID of the newly created task
+    """
     
     connection: InArg[sqlite3.Connection]
     summary: InCompArg[str]
@@ -54,7 +72,22 @@ class TasksCreateTask(Component):
 
 @xai_component
 class TasksGetTaskDetails(Component):
-    """Component to get details of a task by ID."""
+    """Retrieves all details of a specific task by its ID.
+    
+    ##### inPorts:
+    - connection: SQLite database connection
+    - task_id: ID of the task to retrieve
+    
+    ##### outPorts:
+    - task_details: Complete task information as a dictionary
+    - summary: Brief description of the task
+    - conversation: List of conversation history
+    - details: Detailed description
+    - steps: List of task steps
+    - current_step_num: Current step number
+    - is_active: Whether the task is active
+    - is_waiting: Whether the task is waiting
+    """
     
     connection: InArg[sqlite3.Connection]
     task_id: InCompArg[int]
@@ -96,7 +129,12 @@ class TasksGetTaskDetails(Component):
 
 @xai_component
 class TasksDeleteTask(Component):
-    """Component to delete a task by ID."""
+    """Deletes a task from the database.
+    
+    ##### inPorts:
+    - connection: SQLite database connection
+    - task_id: ID of the task to delete
+    """
     
     connection: InArg[sqlite3.Connection]
     task_id: InCompArg[int]
@@ -109,7 +147,16 @@ class TasksDeleteTask(Component):
 
 @xai_component
 class TasksUpdateTask(Component):
-    """Component to update a task by ID."""
+    """Updates an existing task's details.
+    
+    ##### inPorts:
+    - connection: SQLite database connection
+    - task_id: ID of the task to update
+    - summary: New summary text
+    - conversation: Updated conversation history
+    - details: New detailed description
+    - steps: Updated list of steps
+    """
     
     connection: InArg[sqlite3.Connection]
     task_id: InCompArg[int]
@@ -130,7 +177,14 @@ class TasksUpdateTask(Component):
 
 @xai_component
 class TasksListActiveTasks(Component):
-    """Component to list all active tasks."""
+    """Retrieves a list of all active tasks from the database.
+    
+    ##### inPorts:
+    - connection: SQLite database connection
+    
+    ##### outPorts:
+    - active_tasks: List of dictionaries containing active task details
+    """
     
     connection: InArg[sqlite3.Connection]
     active_tasks: OutArg[list]  # Output list of active tasks
@@ -153,7 +207,12 @@ class TasksListActiveTasks(Component):
 
 @xai_component
 class TasksCompleteTask(Component):
-    """Component to mark a task as complete."""
+    """Marks a task as completed by setting is_active to false.
+    
+    ##### inPorts:
+    - connection: SQLite database connection
+    - task_id: ID of the task to complete
+    """
     
     connection: InArg[sqlite3.Connection]
     task_id: InCompArg[int]
@@ -166,7 +225,12 @@ class TasksCompleteTask(Component):
 
 @xai_component
 class TasksDeferTask(Component):
-    """Component to defer a task."""
+    """Marks a task as waiting.
+    
+    ##### inPorts:
+    - connection: SQLite database connection
+    - task_id: ID of the task to defer
+    """
     
     connection: InArg[sqlite3.Connection]
     task_id: InCompArg[int]
@@ -179,7 +243,12 @@ class TasksDeferTask(Component):
 
 @xai_component
 class TasksResumeTask(Component):
-    """Component to defer a task."""
+    """Resumes a waiting task by setting is_waiting to false.
+    
+    ##### inPorts:
+    - connection: SQLite database connection
+    - task_id: ID of the task to resume
+    """
     
     connection: InArg[sqlite3.Connection]
     task_id: InCompArg[int]
@@ -193,7 +262,11 @@ class TasksResumeTask(Component):
 
 @xai_component
 class TasksCloseDB(Component):
-    """Component to close the SQLite database connection."""
+    """Closes the SQLite database connection.
+    
+    ##### inPorts:
+    - connection: SQLite database connection to close
+    """
     
     connection: InArg[sqlite3.Connection]
 
