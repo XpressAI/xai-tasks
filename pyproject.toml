@@ -1,14 +1,14 @@
 [project]
-name = "xircuits-component-library-template"
+name = "xai-tasks"
 version = "0.1.0"
-description = "A brief description of your component library"
+description = "A component library for agents to manage their tasks."
 authors = [{ name = "Your Name", email = "you@example.com" }]
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/yourrepo/your-library"
-keywords = ["xircuits"]
+repository = "https://github.com/XpressAI/xai-tasks"
+keywords = ["xircuits", "agents"]
 
 # Xircuits-specific configurations
 [tool.xircuits]
-default_example_path = "example.xircuits"
+#default_example_path = "example.xircuits"
 requirements_path = "requirements.txt"
