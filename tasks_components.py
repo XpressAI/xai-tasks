@@ -24,6 +24,7 @@ class TasksOpenDB(Component):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT UNIQUE NOT NULL,
                 summary TEXT NOT NULL,
                 conversation TEXT,
                 details TEXT,
@@ -53,22 +54,21 @@ class TasksCreateTask(Component):
     """
     
     connection: InArg[sqlite3.Connection]
+    task_id: InCompArg[str]
     summary: InCompArg[str]
     conversation: InCompArg[list]
     details: InCompArg[str]
     steps: InCompArg[list]
-    task_id: OutArg[int]  # Output task ID
 
     def execute(self, ctx) -> None:
         conn = self.connection.value if self.connection.value is not None else ctx['tasksdb_conn']
 
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO tasks (summary, conversation, details, steps)
-            VALUES (?, ?, ?, ?)
-        ''', (self.summary.value, json.dumps(self.conversation.value), self.details.value, json.dumps(self.steps.value)))
+            INSERT INTO tasks (task_id, summary, conversation, details, steps)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (self.task_id.value, self.summary.value, json.dumps(self.conversation.value), self.details.value, json.dumps(self.steps.value)))
         conn.commit()
-        self.task_id.value = cursor.lastrowid
 
 @xai_component
 class TasksGetTaskDetails(Component):
@@ -90,7 +90,7 @@ class TasksGetTaskDetails(Component):
     """
     
     connection: InArg[sqlite3.Connection]
-    task_id: InCompArg[int]
+    task_id: InCompArg[str]
     task_details: OutArg[dict]  # Output task details all in one for JSON
     summary: OutArg[str]
     conversation: OutArg[list]
@@ -104,11 +104,11 @@ class TasksGetTaskDetails(Component):
         conn = self.connection.value if self.connection.value is not None else ctx['tasksdb_conn']
         cursor = conn.cursor()
 
-        cursor.execute('SELECT * FROM tasks WHERE id = ?', (self.task_id.value,))
+        cursor.execute('SELECT task_id, summary, conversation, details, steps, current_step_num, is_active, is_waiting FROM tasks WHERE task_id = ?', (self.task_id.value,))
         row = cursor.fetchone()
         if row:
             self.task_details.value = {
-                'id': row[0],
+                'task_id': row[0],
                 'summary': row[1],
                 'conversation': json.loads(row[2]),
                 'details': row[3],
@@ -126,6 +126,13 @@ class TasksGetTaskDetails(Component):
             self.is_waiting.value = row[7]
         else:
             self.task_details.value = None
+            self.summary.value = None
+            self.conversation.value = None
+            self.details.value = None
+            self.steps.value = None
+            self.current_step_num.value = None
+            self.is_active.value = None
+            self.is_waiting.value = None
 
 @xai_component
 class TasksDeleteTask(Component):
@@ -137,12 +144,12 @@ class TasksDeleteTask(Component):
     """
     
     connection: InArg[sqlite3.Connection]
-    task_id: InCompArg[int]
+    task_id: InCompArg[str]
 
     def execute(self, ctx) -> None:
         conn = self.connection.value if self.connection.value is not None else ctx['tasksdb_conn']
         cursor = conn.cursor()
-        cursor.execute('DELETE FROM tasks WHERE id = ?', (self.task_id.value,))
+        cursor.execute('DELETE FROM tasks WHERE task_id = ?', (self.task_id.value,))
         conn.commit()
 
 @xai_component
@@ -159,7 +166,7 @@ class TasksUpdateTask(Component):
     """
     
     connection: InArg[sqlite3.Connection]
-    task_id: InCompArg[int]
+    task_id: InCompArg[str]
     summary: InArg[str]
     conversation: InArg[dict]
     details: InArg[str]
@@ -168,11 +175,20 @@ class TasksUpdateTask(Component):
     def execute(self, ctx) -> None:
         conn = self.connection.value if self.connection.value is not None else ctx['tasksdb_conn']
         cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE tasks
-            SET summary = ?, conversation = ?, details = ?, steps = ?
-            WHERE id = ?
-        ''', (self.summary.value, json.dumps(self.conversation.value), self.details.value, json.dumps(self.steps.value), self.task_id.value))
+
+        cursor.execute('SELECT task_id, summary, conversation, details, steps FROM tasks WHERE task_id = ?', (self.task_id.value,))
+        row = cursor.fetchone()
+        if row:
+            summary = self.summary.value if self.summary.value is not None else row[1]
+            conversation = self.conversation.value if self.conversation.value is not None else json.loads(row[2])
+            details = self.details.value if self.details.value is not None else row[3]
+            steps = self.steps.value if self.steps.value is not None else json.loads(row[4])
+            
+            cursor.execute('''
+                UPDATE tasks
+                SET summary = ?, conversation = ?, details = ?, steps = ?
+                WHERE task_id = ?
+            ''', (summary, json.dumps(conversation), details, json.dumps(steps), self.task_id.value))
         conn.commit()
 
 @xai_component
@@ -192,10 +208,10 @@ class TasksListActiveTasks(Component):
     def execute(self, ctx) -> None:
         conn = self.connection.value if self.connection.value is not None else ctx['tasksdb_conn']
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM tasks WHERE is_active = 1')
+        cursor.execute('SELECT task_id, summary, conversation, details, steps, current_step_num, is_active, is_waiting FROM tasks WHERE is_active = 1')
         rows = cursor.fetchall()
         self.active_tasks.value = [{
-            'id': row[0],
+            'task_id': row[0],
             'summary': row[1],
             'conversation': json.loads(row[2]),
             'details': row[3],
@@ -215,12 +231,12 @@ class TasksCompleteTask(Component):
     """
     
     connection: InArg[sqlite3.Connection]
-    task_id: InCompArg[int]
+    task_id: InCompArg[str]
 
     def execute(self, ctx) -> None:
         conn = self.connection.value if self.connection.value is not None else ctx['tasksdb_conn']
         cursor = conn.cursor()
-        cursor.execute('UPDATE tasks SET is_active = 0 WHERE id = ?', (self.task_id.value,))
+        cursor.execute('UPDATE tasks SET is_active = 0 WHERE task_id = ?', (self.task_id.value,))
         conn.commit()
 
 @xai_component
@@ -233,12 +249,12 @@ class TasksDeferTask(Component):
     """
     
     connection: InArg[sqlite3.Connection]
-    task_id: InCompArg[int]
+    task_id: InCompArg[str]
 
     def execute(self, ctx) -> None:
         conn = self.connection.value if self.connection.value is not None else ctx['tasksdb_conn']
         cursor = conn.cursor()
-        cursor.execute('UPDATE tasks SET is_waiting = 1 WHERE id = ?', (self.task_id.value,))
+        cursor.execute('UPDATE tasks SET is_waiting = 1 WHERE task_id = ?', (self.task_id.value,))
         conn.commit()
 
 @xai_component
@@ -251,12 +267,12 @@ class TasksResumeTask(Component):
     """
     
     connection: InArg[sqlite3.Connection]
-    task_id: InCompArg[int]
+    task_id: InCompArg[str]
 
     def execute(self, ctx) -> None:
         conn = self.connection.value if self.connection.value is not None else ctx['tasksdb_conn']
         cursor = conn.cursor()
-        cursor.execute('UPDATE tasks SET is_waiting = 0 WHERE id = ?', (self.task_id.value,))
+        cursor.execute('UPDATE tasks SET is_waiting = 0 WHERE task_id = ?', (self.task_id.value,))
         conn.commit()
         
 
